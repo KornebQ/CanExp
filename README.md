@@ -5,57 +5,63 @@
 <h1 align="center">CanExp</h1>
 
 <p align="center">
-  Проводник для Windows, в котором файлы внутри папки можно раскладывать свободно — как на рабочем столе.
+  A file explorer for Windows where you can arrange files inside a folder freely — just like on the desktop.
 </p>
 
-![Главное окно](docs/main.png)
+<p align="center">
+  <b>English</b> · <a href="README.ru.md">Русский</a>
+</p>
 
-## Зачем
+![Main window](docs/main.png)
 
-Обычный Проводник показывает папку как сетку или список и сам решает, в каком порядке стоят файлы. CanExp превращает каждую папку в холст: перетащите файлы куда удобно, сгруппируйте документы в одном углу, картинки в другом — и в следующий раз папка откроется ровно такой же.
+## Why
 
-## Возможности
+The regular File Explorer shows a folder as a grid or a list and decides the order of files for you. CanExp turns every folder into a canvas: drag files wherever you like, keep documents in one corner and pictures in another — and the folder opens exactly the same way next time.
 
-- **Свободная раскладка.** Файлы и папки перетаскиваются в любое место холста; позиции запоминаются для каждой папки.
-- **Групповое перемещение.** Выделите несколько файлов и перетащите их вместе — взаимное расположение сохранится.
-- **Выделение как в Проводнике.** Клик, Ctrl+клик, Shift+клик (диапазон) и выделение рамкой.
-- **Превью.** Миниатюры фото, видео и PDF берутся из Windows — те же, что в обычном Проводнике; у остальных файлов системные иконки. Загружаются в фоне и не тормозят окно.
-- **Избранное.** Звезда в адресной строке добавляет папку в боковую панель; панель скрывается кнопкой слева в заголовке.
-- **Размер выделенного** в строке состояния — для файлов сразу, для папок считается в фоне вместе со всем содержимым.
-- **Свой файл раскладки `.cexp`.** Двойной клик по нему в обычном Проводнике открывает эту папку в CanExp.
-- **Полупрозрачное окно** с акриловым фоном Windows 11, светлая и тёмная темы по системной настройке.
+> The interface is currently in Russian.
 
-![Выделение рамкой](docs/selection.png)
+## Features
 
-## Управление
+- **Free layout.** Drag files and folders anywhere on the canvas; positions are remembered per folder.
+- **Group move.** Select several files and drag them together — their relative arrangement is kept.
+- **Explorer-style selection.** Click, Ctrl+click, Shift+click (range) and rubber-band selection.
+- **Previews.** Photo, video and PDF thumbnails come from Windows itself — the same ones File Explorer shows; other files get their system icons. Thumbnails load in the background and never freeze the window.
+- **Favorites.** The star in the address bar adds the folder to the sidebar; the sidebar toggles with a button at the left of the title bar.
+- **Selection size** in the status bar — instantly for files, and computed in the background for folders, including everything inside.
+- **Its own `.cexp` layout file.** Double-click it in the regular File Explorer to open that folder in CanExp.
+- **Translucent window** with the Windows 11 acrylic backdrop; light and dark theme follow the system setting.
 
-| Действие | Как |
+![Rubber-band selection](docs/selection.png)
+
+## Controls
+
+| Action | How |
 | --- | --- |
-| Открыть файл или войти в папку | Двойной клик |
-| Выделить | Клик |
-| Добавить к выделению / убрать | Ctrl + клик |
-| Выделить диапазон | Shift + клик |
-| Выделить рамкой | Тянуть мышью с пустого места (с Ctrl или Shift — добавить к выделению) |
-| Переместить | Тянуть файл; если он выделен — едет всё выделение |
-| Перейти по пути | Ввести путь в адресной строке и нажать Enter |
-| Назад / на уровень вверх | Стрелки слева в заголовке |
-| Добавить папку в избранное | Звезда в адресной строке |
-| Убрать из избранного | Правый клик по папке в боковой панели |
-| Показать / скрыть боковую панель | Кнопка слева от «назад» |
+| Open a file or enter a folder | Double-click |
+| Select | Click |
+| Add to / remove from selection | Ctrl + click |
+| Select a range | Shift + click |
+| Rubber-band select | Drag from an empty spot (with Ctrl or Shift — add to the selection) |
+| Move | Drag a file; if it is selected, the whole selection moves |
+| Go to a path | Type it in the address bar and press Enter |
+| Back / up one level | Arrows at the left of the title bar |
+| Add folder to favorites | Star in the address bar |
+| Remove from favorites | Right-click the folder in the sidebar |
+| Show / hide the sidebar | Button to the left of "back" |
 
-## Где хранятся данные
+## Where data is stored
 
-- **Раскладка папки** — файл `folder.cexp` внутри самой папки (обычный JSON с координатами). Создаётся только после того, как вы что-то передвинули, и путешествует вместе с папкой при копировании и архивации. В самом CanExp он не показывается.
-- **Избранное и настройки окна** — `%APPDATA%\CanExp\settings.json`.
-- **Привязка расширения `.cexp`** — регистрируется при запуске в `HKEY_CURRENT_USER\Software\Classes` (права администратора не нужны).
+- **Folder layout** — a `folder.cexp` file inside the folder itself (plain JSON with coordinates). It is created only after you move something, and travels with the folder when you copy or archive it. CanExp itself doesn't show it.
+- **Favorites and window settings** — `%APPDATA%\CanExp\settings.json`.
+- **`.cexp` file association** — registered on startup under `HKEY_CURRENT_USER\Software\Classes` (no admin rights needed).
 
-## Сборка
+## Building
 
-Нужны:
+You need:
 
-- Windows 10 или 11 (акриловый фон — Windows 11 22H2 и новее; на более старых окно просто тёмное);
-- [Rust](https://rustup.rs) (stable, toolchain MSVC);
-- Visual Studio Build Tools с компонентом «Разработка классических приложений на C++» — он же ставит Windows SDK с `rc.exe`, через который в exe встраивается иконка.
+- Windows 10 or 11 (the acrylic backdrop requires Windows 11 22H2 or newer; on older systems the window is simply dark);
+- [Rust](https://rustup.rs) (stable, MSVC toolchain);
+- Visual Studio Build Tools with the "Desktop development with C++" workload — it also installs the Windows SDK with `rc.exe`, which embeds the icon into the exe.
 
 ```powershell
 git clone https://github.com/KornebQ/CanExp.git
@@ -63,32 +69,32 @@ cd CanExp
 cargo build --release
 ```
 
-Готовая программа — `target\release\canexp.exe`. Её можно запускать без аргументов (откроется папка пользователя), с путём к папке или с путём к файлу `.cexp`.
+The program is `target\release\canexp.exe`. Run it without arguments (opens your user folder), with a folder path, or with a path to a `.cexp` file.
 
 ```powershell
 cargo test
 ```
 
-## Известные ограничения
+## Known limitations
 
-- Нет перетаскивания файлов между CanExp и обычным Проводником, нет контекстного меню Проводника, переименования и удаления.
-- Файлы могут лежать друг на друге — холст свободный, сетки-«магнита» нет.
-- Если тянуть рамку выделения к краю окна, список не прокручивается сам.
-- В папку без права записи (например, `C:\Program Files`) раскладку сохранить нельзя — программа покажет ошибку.
-- Миниатюры загружаются в порядке файлов в папке, а не начиная с видимых.
+- No drag-and-drop between CanExp and the regular File Explorer, no Explorer context menu, no rename or delete.
+- Files can overlap — the canvas is free-form, there is no snap-to-grid.
+- Dragging the selection rectangle to the window edge doesn't auto-scroll.
+- The layout can't be saved in folders without write access (e.g. `C:\Program Files`) — the app shows an error.
+- Thumbnails load in folder order, not visible-first.
 
-## Устройство
+## Under the hood
 
-Rust + [egui/eframe](https://github.com/emilk/egui), Windows API через крейт [`windows`](https://github.com/microsoft/windows-rs).
+Rust + [egui/eframe](https://github.com/emilk/egui), Windows API via the [`windows`](https://github.com/microsoft/windows-rs) crate.
 
-| Файл | Что внутри |
+| File | Contents |
 | --- | --- |
-| `src/main.rs` | окно, холст, выделение, перетаскивание, боковая панель, раскладка и настройки |
-| `src/icons.rs` | миниатюры и иконки через `IShellItemImageFactory` в фоновом потоке |
-| `src/sizes.rs` | подсчёт размера папок в фоне |
-| `src/style.rs` | шрифт, цвета, акриловый фон окна |
-| `build.rs` | встраивание иконки в exe |
+| `src/main.rs` | window, canvas, selection, dragging, sidebar, layout and settings |
+| `src/icons.rs` | thumbnails and icons via `IShellItemImageFactory` on a background thread |
+| `src/sizes.rs` | folder size calculation in the background |
+| `src/style.rs` | font, colors, acrylic window backdrop |
+| `build.rs` | embedding the icon into the exe |
 
-## Лицензия
+## License
 
 [MIT](LICENSE)
