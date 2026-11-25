@@ -1,0 +1,16 @@
+[package]
+name = "canexp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+winreg = "0.52"
+# same version eframe already pulls in, so no extra crate is built
+windows = { version = "0.58", features = ["Win32_UI_Shell", "Win32_UI_Controls", "Win32_Graphics_Gdi", "Win32_Graphics_Dwm", "Win32_System_Com"] }
+raw-window-handle = "0.6" # already in eframe's tree; needed to get the HWND for the acrylic backdrop
+
+[build-dependencies]
+winresource = "0.1" # embeds assets/icon.ico into the exe (Explorer, Alt+Tab, pinned taskbar)
