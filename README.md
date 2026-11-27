@@ -24,6 +24,7 @@ The regular File Explorer shows a folder as a grid or a list and decides the ord
 
 - **Free layout.** Drag files and folders anywhere on the canvas; positions are remembered per folder.
 - **Group move.** Select several files and drag them together — their relative arrangement is kept.
+- **Drag and drop with other programs.** Drag files past the window edge and drop them into a browser, a messenger, another Explorer folder — anything that accepts files from Explorer. Files dropped onto CanExp land in the open folder right where you dropped them: moved from the same drive, copied from another, like in Explorer.
 - **Explorer-style selection.** Click, Ctrl+click, Shift+click (range) and rubber-band selection.
 - **Previews.** Photo, video and PDF thumbnails come from Windows itself — the same ones File Explorer shows; other files get their system icons. Thumbnails load in the background and never freeze the window.
 - **Favorites.** The star in the address bar adds the folder to the sidebar; the sidebar toggles with a button at the left of the title bar.
@@ -77,7 +78,7 @@ cargo test
 
 ## Known limitations
 
-- No drag-and-drop between CanExp and the regular File Explorer, no Explorer context menu, no rename or delete.
+- No Explorer context menu, no rename or delete.
 - Files can overlap — the canvas is free-form, there is no snap-to-grid.
 - Dragging the selection rectangle to the window edge doesn't auto-scroll.
 - The layout can't be saved in folders without write access (e.g. `C:\Program Files`) — the app shows an error.

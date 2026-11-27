@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+mod dnd;
 mod icons;
 mod sizes;
 mod style;
@@ -87,6 +88,8 @@ struct App {
     band: Option<(Vec2, HashSet<String>)>,
     /// Group drag in progress: pointer press point and each dragged item's start position.
     drag: Option<(Pos2, HashMap<String, Pos2>)>,
+    /// Screen position of the canvas origin last frame, to place dropped files where they were dropped.
+    canvas_origin: Pos2,
     settings: Settings,
     folder_sizes: sizes::FolderSizes,
     /// Folder size by path; present-but-None = still counting.
@@ -109,6 +112,7 @@ impl App {
             anchor: None,
             band: None,
             drag: None,
+            canvas_origin: Pos2::ZERO,
             settings: Settings::load(),
         };
         app.load(dir);
@@ -336,7 +340,7 @@ impl eframe::App for App {
         [0.0; 4] // let the acrylic backdrop show through
     }
 
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         while let Ok((path, size)) = self.folder_sizes.rx.try_recv() {
             self.dir_sizes.insert(path, Some(size));
         }
@@ -345,6 +349,52 @@ impl eframe::App for App {
                 let tex = img.map(|img| ctx.load_texture(path.display().to_string(), img, Default::default()));
                 self.thumbs.insert(path, tex);
             }
+        }
+
+        // Dragging files past the window edge hands them to Windows, so they can be dropped into other programs.
+        let outside = ctx.input(|i| i.pointer.latest_pos()).map_or(true, |p| !ctx.screen_rect().contains(p));
+        if self.drag.is_some() && outside {
+            let (_, starts) = self.drag.take().unwrap();
+            for item in &mut self.items {
+                if let Some(start) = starts.get(&item.name) {
+                    item.pos = Some(*start); // it left the canvas, so the move on the canvas is undone
+                }
+            }
+            let paths: Vec<PathBuf> = starts.keys().map(|n| self.dir.join(n)).collect();
+            if let Some(Err(e)) = dnd::hwnd(frame).map(|h| dnd::drag_out(h, &paths)) {
+                self.error = Some(format!("Не удалось начать перетаскивание: {e}"));
+            }
+            if paths.iter().any(|p| !p.exists()) {
+                self.load(self.dir.clone()); // the target moved files away
+            }
+        }
+
+        // Files dropped onto the window from other programs land in this folder, at the drop point, selected.
+        let incoming: Vec<PathBuf> = ctx.input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
+        let incoming: Vec<PathBuf> = incoming.into_iter().filter(|p| p.parent() != Some(self.dir.as_path())).collect();
+        if let (false, Some(hwnd)) = (incoming.is_empty(), dnd::hwnd(frame)) {
+            let at = dnd::cursor_in_client(hwnd).map(|(x, y)| Pos2::new(x as f32, y as f32) / ctx.pixels_per_point());
+            // shortcut: the copy runs on the UI thread (the shell shows its own progress window); move it to a thread if big copies feel frozen.
+            let (moves, copies): (Vec<PathBuf>, Vec<PathBuf>) = incoming.iter().cloned().partition(|p| dnd::same_volume(p, &self.dir));
+            let mut error = None;
+            for (group, moving) in [(moves, true), (copies, false)] {
+                if let (false, Err(e)) = (group.is_empty(), dnd::receive(hwnd, &group, &self.dir, moving)) {
+                    error = Some(format!("Не удалось {} файлы: {e}", if moving { "переместить" } else { "скопировать" }));
+                }
+            }
+            self.load(self.dir.clone());
+            let names: Vec<String> = incoming.iter().filter_map(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned()).collect();
+            if let Some(at) = at {
+                let base = (at - self.canvas_origin - Vec2::new(CELL_W, CELL_H) / 2.0).max(Vec2::ZERO);
+                for (k, name) in names.iter().enumerate() {
+                    if let Some(item) = self.items.iter_mut().find(|i| &i.name == name) {
+                        item.pos = Some(Pos2::new(base.x + (k % 4) as f32 * CELL_W, base.y + (k / 4) as f32 * CELL_H));
+                    }
+                }
+                self.save();
+            }
+            self.selected = names.into_iter().filter(|n| self.items.iter().any(|i| &i.name == n)).collect();
+            self.error = error.or(self.error.take());
         }
 
         let mut go: Option<PathBuf> = None;
@@ -538,6 +588,13 @@ impl eframe::App for App {
                 let extent = self.items.iter().filter_map(|i| i.pos).fold(Vec2::ZERO, |m, p| m.max(p.to_vec2() + Vec2::new(CELL_W, CELL_H)));
                 let (area, bg) = ui.allocate_exact_size((extent + Vec2::splat(PAD * 2.0)).max(ui.available_size()), Sense::click_and_drag());
                 let canvas = area.shrink(PAD);
+                self.canvas_origin = canvas.min;
+                if ui.input(|i| !i.raw.hovered_files.is_empty()) {
+                    // files from another program are held over the window
+                    let r = ui.clip_rect().shrink(4.0);
+                    ui.painter().rect_filled(r, 10.0, Color32::from_rgba_unmultiplied(10, 132, 255, 25));
+                    ui.painter().rect_stroke(r, 10.0, Stroke::new(2.0_f32, style::ACCENT), StrokeKind::Inside);
+                }
                 if bg.clicked() && !ctrl && !shift {
                     self.selected.clear();
                 }
