@@ -44,6 +44,7 @@ The regular File Explorer shows a folder as a grid or a list and decides the ord
 | Select a range | Shift + click |
 | Rubber-band select | Drag from an empty spot (with Ctrl or Shift — add to the selection) |
 | Move | Drag a file; if it is selected, the whole selection moves |
+| Move into a folder | Drop files onto a folder on the canvas or in the sidebar; hold Ctrl to copy instead |
 | Go to a path | Type it in the address bar and press Enter |
 | Back / up one level | Arrows at the left of the title bar |
 | Add folder to favorites | Star in the address bar |

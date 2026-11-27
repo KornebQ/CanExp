@@ -526,6 +526,7 @@ impl eframe::App for App {
                 });
             });
 
+        let mut side_target: Option<PathBuf> = None;
         if self.settings.sidebar {
             egui::SidePanel::left("sidebar")
                 .exact_width(SIDEBAR_W)
@@ -548,7 +549,15 @@ impl eframe::App for App {
                     for (i, fav) in self.settings.favorites.iter().enumerate() {
                         let (rect, resp) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 28.0), Sense::click());
                         let v = ui.visuals();
-                        if *fav == self.dir {
+                        // a favorite under the pointer while files are dragged takes them (not the open folder, not into itself)
+                        let over = self.drag.as_ref().is_some_and(|(_, starts)| {
+                            *fav != self.dir && !starts.keys().any(|n| fav.starts_with(self.dir.join(n)))
+                        }) && ui.input(|i| i.pointer.interact_pos()).is_some_and(|p| rect.contains(p));
+                        if over {
+                            side_target = Some(fav.clone());
+                            ui.painter().rect_filled(rect, 6.0, Color32::from_rgba_unmultiplied(10, 132, 255, 40));
+                            ui.painter().rect_stroke(rect, 6.0, Stroke::new(2.0_f32, style::ACCENT), StrokeKind::Inside);
+                        } else if *fav == self.dir {
                             ui.painter().rect_filled(rect, 6.0, Color32::from_rgba_unmultiplied(10, 132, 255, 70));
                         } else if resp.hovered() {
                             ui.painter().rect_filled(rect, 6.0, v.widgets.hovered.weak_bg_fill);
@@ -581,6 +590,9 @@ impl eframe::App for App {
         // No panel margin: the scroll bars sit at the window edge (style.rs keeps a gap the width of a collapsed bar);
         // the canvas carries its own padding instead.
         const PAD: f32 = 12.0;
+        // (destination folder, dragged files, Ctrl held = copy) when files are dropped onto a folder
+        let mut move_into: Option<(PathBuf, Vec<PathBuf>, bool)> = None;
+        let mut drop_dest: Option<PathBuf> = None;
         egui::CentralPanel::default().frame(egui::Frame::NONE).show(ctx, |ui| {
             self.place_new(ui.available_width() - PAD * 2.0);
             let mut dirty = false;
@@ -654,8 +666,28 @@ impl eframe::App for App {
                     let starts = self.items.iter().filter(|i| self.selected.contains(&i.name)).map(|i| (i.name.clone(), i.pos.unwrap())).collect();
                     self.drag = ui.input(|i| i.pointer.press_origin()).map(|o| (o, starts));
                 }
+                // A folder under the pointer (other than the dragged items) takes the dragged files on release.
+                let target = self.drag.as_ref().and_then(|(_, starts)| {
+                    let p = ui.input(|i| i.pointer.interact_pos())?;
+                    let hit = |&&(i, cell, _): &&(usize, Rect, bool)| {
+                        let item = &self.items[i];
+                        item.is_dir && !starts.contains_key(&item.name) && cell.contains(p)
+                    };
+                    cells.iter().find(hit).map(|&(i, ..)| i)
+                });
+                let dest = target.map(|t| self.dir.join(&self.items[t].name)).or(side_target.clone());
+                drop_dest = dest.clone();
                 if self.drag.is_some() && (drag_stopped || !ui.input(|i| i.pointer.primary_down())) {
-                    self.drag = None;
+                    let (_, starts) = self.drag.take().unwrap();
+                    if let Some(dest) = dest {
+                        // back to where they were, so a cancelled or failed move leaves the canvas as it was
+                        for item in self.items.iter_mut() {
+                            if let Some(start) = starts.get(&item.name) {
+                                item.pos = Some(*start);
+                            }
+                        }
+                        move_into = Some((dest, starts.keys().map(|n| self.dir.join(n)).collect(), ctrl));
+                    }
                     dirty = true;
                 }
 
@@ -691,14 +723,20 @@ impl eframe::App for App {
                         self.thumbs.insert(path.clone(), None);
                         self.loader.request(path.clone());
                     }
-                    let sel = self.selected.contains(&item.name);
+                    // over a target folder the dragged items turn see-through, so the folder's highlight shows
+                    let ghost = drop_dest.is_some() && self.drag.as_ref().is_some_and(|(_, s)| s.contains_key(&item.name));
+                    let fade = if ghost { 0.5 } else { 1.0 };
+                    let sel = self.selected.contains(&item.name) && !ghost;
                     let p = ui.painter();
                     let icon_box = Rect::from_min_size(rect.min + Vec2::new((CELL_W - ICON) / 2.0, 8.0), Vec2::splat(ICON));
-                    let text_color = ui.visuals().text_color();
+                    let text_color = ui.visuals().text_color().gamma_multiply(fade);
                     let galley = name_galley(ui, &item.name, 2, text_color);
                     let text_top = icon_box.bottom() + 6.0;
                     let hl = Rect::from_min_max(rect.min + Vec2::new(2.0, 0.0), rect.max - Vec2::new(2.0, 2.0));
-                    if sel {
+                    if target == Some(idx) {
+                        p.rect_filled(hl, 8.0, Color32::from_rgba_unmultiplied(10, 132, 255, 40));
+                        p.rect_stroke(hl, 8.0, Stroke::new(2.0_f32, style::ACCENT), StrokeKind::Inside);
+                    } else if sel {
                         p.rect_filled(hl, 8.0, Color32::from_rgba_unmultiplied(10, 132, 255, 70));
                         p.rect_stroke(hl, 8.0, Stroke::new(1.0_f32, style::ACCENT.gamma_multiply(0.8)), StrokeKind::Inside);
                     } else if hovered {
@@ -709,7 +747,7 @@ impl eframe::App for App {
                             let size = tex.size_vec2();
                             let fit = size * (ICON / size.x.max(size.y));
                             let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
-                            p.image(tex.id(), Rect::from_center_size(icon_box.center(), fit), uv, Color32::WHITE);
+                            p.image(tex.id(), Rect::from_center_size(icon_box.center(), fit), uv, Color32::WHITE.gamma_multiply(fade));
                         }
                         _ => {
                             p.rect_filled(icon_box.shrink(12.0), 8.0, if dark { Color32::from_white_alpha(10) } else { Color32::from_black_alpha(8) });
@@ -734,6 +772,28 @@ impl eframe::App for App {
                 }
             }
         });
+
+        // where the dragged files would go, next to the pointer, like Explorer's "Move to" hint
+        if let (Some(dest), Some(p)) = (&drop_dest, ctx.input(|i| i.pointer.interact_pos())) {
+            let copy = ctx.input(|i| i.modifiers.command);
+            let verb = if copy { t("Copy to", "Копіювати в", "Копировать в") } else { t("Move to", "Перемістити в", "Переместить в") };
+            let name = dest.file_name().map_or(dest.display().to_string(), |n| n.to_string_lossy().into_owned());
+            let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("drop_hint")));
+            let galley = painter.layout_no_wrap(format!("{verb} «{name}»"), FontId::proportional(12.0), Color32::WHITE);
+            let at = p + Vec2::new(16.0, 18.0);
+            painter.rect_filled(Rect::from_min_size(at, galley.size()).expand2(Vec2::new(8.0, 4.0)), 6.0, style::ACCENT);
+            painter.galley(at, galley, Color32::WHITE);
+        }
+
+        if let (Some((folder, paths, copy)), Some(hwnd)) = (move_into, dnd::hwnd(frame)) {
+            // same rules and dialogs as a drop from Explorer: conflict prompts, undo in Explorer
+            let error = dnd::receive(hwnd, &paths, &folder, !copy).err();
+            self.load(self.dir.clone());
+            if let Some(e) = error {
+                let what = if copy { t("Couldn't copy the files", "Не вдалося скопіювати файли", "Не удалось скопировать файлы") } else { t("Couldn't move the files", "Не вдалося перемістити файли", "Не удалось переместить файлы") };
+                self.error = Some(format!("{what}: {e}"));
+            }
+        }
 
         if let Some(dir) = go {
             self.navigate(dir);
