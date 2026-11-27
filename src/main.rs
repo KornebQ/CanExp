@@ -93,6 +93,7 @@ struct App {
     drag: Option<(Pos2, HashMap<String, Pos2>)>,
     /// Screen position of the canvas origin last frame, to place dropped files where they were dropped.
     canvas_origin: Pos2,
+    was_unfocused: bool,
     settings: Settings,
     folder_sizes: sizes::FolderSizes,
     /// Folder size by path; present-but-None = still counting.
@@ -116,6 +117,7 @@ impl App {
             band: None,
             drag: None,
             canvas_origin: Pos2::ZERO,
+            was_unfocused: false,
             settings: Settings::load(),
         };
         app.load(dir);
@@ -404,10 +406,21 @@ impl eframe::App for App {
         let dark = ctx.style().visuals.dark_mode;
         let tint = |a: u8| if dark { Color32::from_black_alpha(a) } else { Color32::from_white_alpha(a) };
         let on_edge = edge_resize(ctx);
-        // Windows swaps the acrylic for a flat, lighter fill when the window loses focus; darken it instead.
+        // The blur stays the same when focus changes (see WM_NCACTIVATE below); an inactive window just fades darker.
         // Painted first on the background layer, so it sits under the panels and content.
-        if ctx.input(|i| i.viewport().focused) == Some(false) {
-            let shade = Color32::from_black_alpha(if dark { 120 } else { 40 });
+        let unfocused = ctx.input(|i| i.viewport().focused) == Some(false);
+        if unfocused && !self.was_unfocused {
+            // tell the frame it is still active, so Windows keeps the acrylic instead of its flat inactive fill
+            if let Some(hwnd) = dnd::hwnd(frame) {
+                use windows::Win32::Foundation::{LPARAM, WPARAM};
+                use windows::Win32::UI::WindowsAndMessaging::{SendMessageW, WM_NCACTIVATE};
+                unsafe { SendMessageW(hwnd, WM_NCACTIVATE, WPARAM(1), LPARAM(0)) };
+            }
+        }
+        self.was_unfocused = unfocused;
+        let f = ctx.animate_bool_with_time(egui::Id::new("inactive_shade"), unfocused, 0.2);
+        if f > 0.0 {
+            let shade = Color32::from_black_alpha(((if dark { 90.0 } else { 40.0 }) * f) as u8);
             ctx.layer_painter(egui::LayerId::background()).rect_filled(ctx.screen_rect(), 0.0, shade);
         }
 
