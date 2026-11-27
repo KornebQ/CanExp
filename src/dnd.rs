@@ -31,7 +31,7 @@ pub fn receive(hwnd: HWND, paths: &[PathBuf], dir: &Path, moving: bool) -> Resul
         ..Default::default()
     };
     let rc = unsafe { SHFileOperationW(&mut op) };
-    if rc == 0 || op.fAnyOperationsAborted.as_bool() { Ok(()) } else { Err(format!("ошибка {rc:#x}")) }
+    if rc == 0 || op.fAnyOperationsAborted.as_bool() { Ok(()) } else { Err(format!("{} {rc:#x}", crate::lang::t("error", "помилка", "ошибка"))) }
 }
 
 /// Mouse position in the window's client area, in physical pixels.

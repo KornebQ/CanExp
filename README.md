@@ -9,16 +9,16 @@
 </p>
 
 <p align="center">
-  <b>English</b> · <a href="README.ru.md">Русский</a>
+  <b>English</b> · <a href="README.uk.md">Українська</a>
 </p>
 
-![Main window](docs/main.png)
+![Main window](docs/en/main.png)
 
 ## Why
 
 The regular File Explorer shows a folder as a grid or a list and decides the order of files for you. CanExp turns every folder into a canvas: drag files wherever you like, keep documents in one corner and pictures in another — and the folder opens exactly the same way next time.
 
-> The interface is currently in Russian.
+> The interface is in English, Ukrainian and Russian and follows the Windows display language. To pick one yourself, set the `CANEXP_LANG` environment variable to `en`, `uk` or `ru`.
 
 ## Features
 
@@ -32,7 +32,7 @@ The regular File Explorer shows a folder as a grid or a list and decides the ord
 - **Its own `.cexp` layout file.** Double-click it in the regular File Explorer to open that folder in CanExp.
 - **Translucent window** with the Windows 11 acrylic backdrop; light and dark theme follow the system setting.
 
-![Rubber-band selection](docs/selection.png)
+![Rubber-band selection](docs/en/selection.png)
 
 ## Controls
 
@@ -93,6 +93,8 @@ Rust + [egui/eframe](https://github.com/emilk/egui), Windows API via the [`windo
 | `src/main.rs` | window, canvas, selection, dragging, sidebar, layout and settings |
 | `src/icons.rs` | thumbnails and icons via `IShellItemImageFactory` on a background thread |
 | `src/sizes.rs` | folder size calculation in the background |
+| `src/dnd.rs` | drag and drop with other programs |
+| `src/lang.rs` | interface language |
 | `src/style.rs` | font, colors, acrylic window backdrop |
 | `build.rs` | embedding the icon into the exe |
 

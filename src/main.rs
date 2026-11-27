@@ -9,6 +9,8 @@ use std::sync::Arc;
 
 mod dnd;
 mod icons;
+mod lang;
+use lang::{lang, t, Lang};
 mod sizes;
 mod style;
 
@@ -62,14 +64,15 @@ impl Settings {
     }
 }
 
-fn human_size(bytes: u64) -> String {
-    let units = ["Б", "КБ", "МБ", "ГБ", "ТБ"];
+fn human_size(bytes: u64, lang: Lang) -> String {
+    let units = if lang == Lang::En { ["B", "KB", "MB", "GB", "TB"] } else { ["Б", "КБ", "МБ", "ГБ", "ТБ"] };
     let (mut v, mut u) = (bytes as f64, 0);
     while v >= 1024.0 && u < units.len() - 1 {
         v /= 1024.0;
         u += 1;
     }
-    if u == 0 { format!("{bytes} Б") } else { format!("{v:.1} {}", units[u]).replace('.', ",") }
+    let s = if u == 0 { format!("{bytes} {}", units[0]) } else { format!("{v:.1} {}", units[u]) };
+    if lang == Lang::En { s } else { s.replace('.', ",") } // decimal comma in Ukrainian and Russian
 }
 
 struct App {
@@ -170,7 +173,7 @@ impl App {
         };
         let json = serde_json::to_string_pretty(&layout).expect("layout serializes");
         if let Err(e) = fs::write(self.dir.join(LAYOUT_FILE), json) {
-            self.error = Some(format!("Не удалось сохранить раскладку: {e}"));
+            self.error = Some(format!("{}: {e}", t("Couldn't save the layout", "Не вдалося зберегти розкладку", "Не удалось сохранить раскладку")));
         }
     }
 
@@ -362,7 +365,7 @@ impl eframe::App for App {
             }
             let paths: Vec<PathBuf> = starts.keys().map(|n| self.dir.join(n)).collect();
             if let Some(Err(e)) = dnd::hwnd(frame).map(|h| dnd::drag_out(h, &paths)) {
-                self.error = Some(format!("Не удалось начать перетаскивание: {e}"));
+                self.error = Some(format!("{}: {e}", t("Couldn't start dragging", "Не вдалося почати перетягування", "Не удалось начать перетаскивание")));
             }
             if paths.iter().any(|p| !p.exists()) {
                 self.load(self.dir.clone()); // the target moved files away
@@ -379,7 +382,7 @@ impl eframe::App for App {
             let mut error = None;
             for (group, moving) in [(moves, true), (copies, false)] {
                 if let (false, Err(e)) = (group.is_empty(), dnd::receive(hwnd, &group, &self.dir, moving)) {
-                    error = Some(format!("Не удалось {} файлы: {e}", if moving { "переместить" } else { "скопировать" }));
+                    error = Some(format!("{}: {e}", if moving { t("Couldn't move the files", "Не вдалося перемістити файли", "Не удалось переместить файлы") } else { t("Couldn't copy the files", "Не вдалося скопіювати файли", "Не удалось скопировать файлы") }));
                 }
             }
             self.load(self.dir.clone());
@@ -472,7 +475,7 @@ impl eframe::App for App {
                     go = Some(PathBuf::from(self.path_input.trim()));
                 }
                 let star = Rect::from_center_size(Pos2::new(field.right() - 15.0, field.center().y), Vec2::splat(22.0));
-                let star_resp = ui.interact(star, ui.id().with("star"), Sense::click()).on_hover_text("Избранное");
+                let star_resp = ui.interact(star, ui.id().with("star"), Sense::click()).on_hover_text(t("Favorites", "Обране", "Избранное"));
                 let fav = self.settings.favorites.contains(&self.dir);
                 let color = if fav { Color32::from_rgb(255, 196, 0) } else { ui.visuals().weak_text_color() };
                 let color = if star_resp.hovered() && !fav { ui.visuals().text_color() } else { color };
@@ -484,13 +487,13 @@ impl eframe::App for App {
                         self.settings.favorites.push(self.dir.clone());
                     }
                     if let Err(e) = self.settings.save() {
-                        self.error = Some(format!("Не удалось сохранить избранное: {e}"));
+                        self.error = Some(format!("{}: {e}", t("Couldn't save favorites", "Не вдалося зберегти обране", "Не удалось сохранить избранное")));
                     }
                 }
             });
 
         let text = if self.selected.is_empty() {
-            format!("Объектов: {}", self.items.len())
+            format!("{}: {}", t("Items", "Об'єктів", "Объектов"), self.items.len())
         } else {
             let (mut total, mut counting, mut count) = (0u64, false, 0);
             for item in self.items.iter().filter(|i| self.selected.contains(&i.name)) {
@@ -510,8 +513,8 @@ impl eframe::App for App {
                     }
                 }
             }
-            let size = human_size(total) + if counting { " (считается…)" } else { "" };
-            format!("Выбрано: {} из {}\u{2003}·\u{2003}{}", count, self.items.len(), size)
+            let size = human_size(total, lang()) + if counting { t(" (counting…)", " (рахується…)", " (считается…)") } else { "" };
+            format!("{}: {count} {} {}\u{2003}·\u{2003}{size}", t("Selected", "Вибрано", "Выбрано"), t("of", "з", "из"), self.items.len())
         };
         egui::TopBottomPanel::bottom("status")
             .frame(egui::Frame::NONE.fill(tint(40)).inner_margin(egui::Margin::symmetric(12, 4)))
@@ -533,12 +536,12 @@ impl eframe::App for App {
                     ui.add_space(2.0);
                     ui.horizontal(|ui| {
                         ui.add_space(8.0);
-                        ui.label(egui::RichText::new("Избранное").size(11.0).family(style::bold()).weak());
+                        ui.label(egui::RichText::new(t("Favorites", "Обране", "Избранное")).size(11.0).family(style::bold()).weak());
                     });
                     if self.settings.favorites.is_empty() {
                         ui.horizontal_wrapped(|ui| {
                             ui.add_space(8.0);
-                            ui.label(egui::RichText::new("Нажмите ☆ в адресной строке, чтобы добавить папку").size(11.0).weak());
+                            ui.label(egui::RichText::new(t("Click ☆ in the address bar to add a folder", "Натисніть ☆ в адресному рядку, щоб додати папку", "Нажмите ☆ в адресной строке, чтобы добавить папку")).size(11.0).weak());
                         });
                     }
                     let mut remove = None;
@@ -561,7 +564,7 @@ impl eframe::App for App {
                             go = Some(fav.clone());
                         }
                         resp.context_menu(|ui| {
-                            if ui.button("Убрать из избранного").clicked() {
+                            if ui.button(t("Remove from favorites", "Прибрати з обраного", "Убрать из избранного")).clicked() {
                                 remove = Some(i);
                                 ui.close_menu();
                             }
@@ -727,7 +730,7 @@ impl eframe::App for App {
                 if self.items[idx].is_dir {
                     go = Some(path);
                 } else if let Err(e) = std::process::Command::new("explorer").arg(&path).spawn() {
-                    self.error = Some(format!("Не удалось открыть {}: {e}", path.display()));
+                    self.error = Some(format!("{} {}: {e}", t("Couldn't open", "Не вдалося відкрити", "Не удалось открыть"), path.display()));
                 }
             }
         });
@@ -744,7 +747,7 @@ fn register_extension() -> std::io::Result<()> {
     let exe = std::env::current_exe()?;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     hkcu.create_subkey(r"Software\Classes\.cexp")?.0.set_value("", &"CanExp.Folder")?;
-    hkcu.create_subkey(r"Software\Classes\CanExp.Folder")?.0.set_value("", &"Раскладка папки CanExp")?;
+    hkcu.create_subkey(r"Software\Classes\CanExp.Folder")?.0.set_value("", &t("CanExp folder layout", "Розкладка папки CanExp", "Раскладка папки CanExp"))?;
     hkcu.create_subkey(r"Software\Classes\CanExp.Folder\shell\open\command")?
         .0
         .set_value("", &format!("\"{}\" \"%1\"", exe.display()))?;
@@ -806,8 +809,9 @@ mod tests {
 
     #[test]
     fn human_size_units() {
-        assert_eq!(human_size(512), "512 Б");
-        assert_eq!(human_size(1536), "1,5 КБ");
-        assert_eq!(human_size(3 * 1024 * 1024 * 1024), "3,0 ГБ");
+        assert_eq!(human_size(512, Lang::Uk), "512 Б");
+        assert_eq!(human_size(1536, Lang::Ru), "1,5 КБ");
+        assert_eq!(human_size(3 * 1024 * 1024 * 1024, Lang::Uk), "3,0 ГБ");
+        assert_eq!(human_size(1536, Lang::En), "1.5 KB");
     }
 }
